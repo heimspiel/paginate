@@ -267,11 +267,10 @@ func (r resContext) Response(res interface{}) Page {
 func (r *resContext) CalculateCount(query *gorm.DB, result *gorm.DB) int64 {
 	var countResult int64
 	var cache gocache.AdapterInterface
-	cacheEnabled := false
-	if cachePointer := r.Pagination.Config.CacheAdapter; cachePointer != nil {
-		cache = *cachePointer
-		cacheEnabled = true
+	if r.Pagination.Config.CacheAdapter != nil {
+		cache = *r.Pagination.Config.CacheAdapter
 	}
+	cacheEnabled := cache != nil
 
 	stmt := &gorm.Statement{DB: query.Statement.DB}
 	if err := stmt.Parse(query.Statement.Model); err != nil {
