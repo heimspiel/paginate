@@ -736,6 +736,12 @@ func generateWhereCauses(f PageFilters, config Config) ([]string, []interface{})
 				} else {
 					if strValue, isStr := f.Value.(string); isStr && strings.ToLower(strValue) == "null" {
 						wheres = append(wheres, fname, f.Operator, "NULL")
+					} else if strings.ToLower(strValue) == "empty" {
+						if f.Operator == "IS NOT" {
+							wheres = append(wheres, fname, "!=", "''")
+						} else {
+							wheres = append(wheres, fname, "=", "''")
+						}
 					} else {
 						wheres = append(wheres, fname, f.Operator, "?")
 						params = append(params, f.Value)
