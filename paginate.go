@@ -2,6 +2,8 @@ package paginate
 
 import (
 	"crypto/md5"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -135,7 +137,7 @@ func (r resContext) Response(res interface{}) Page {
 	causes := createCauses(pr)
 	cKey := ""
 	var adapter gocache.AdapterInterface
-	var hasAdapter bool = false
+	var hasAdapter = false
 
 	if nil != p.Config.CacheAdapter {
 		cKey = createCacheKey(r.cachePrefix, pr)
@@ -195,7 +197,9 @@ func (r resContext) Response(res interface{}) Page {
 		result = result.Where(causes.WhereString, causes.Params...)
 	}
 
-	page.Total = r.CalculateCount(query, result)
+	// Calculate count before applying limit and offset because they should not affect
+	// the count cache key.
+	page.Total = r.CalculateCount(result)
 
 	result = result.
 		Limit(causes.Limit).
@@ -264,7 +268,7 @@ func (r resContext) Response(res interface{}) Page {
 	return page
 }
 
-func (r *resContext) CalculateCount(query *gorm.DB, result *gorm.DB) int64 {
+func (r *resContext) CalculateCount(result *gorm.DB) int64 {
 	var countResult int64
 	var cache gocache.AdapterInterface
 	if r.Pagination.Config.CacheAdapter != nil {
@@ -272,16 +276,13 @@ func (r *resContext) CalculateCount(query *gorm.DB, result *gorm.DB) int64 {
 	}
 	cacheEnabled := cache != nil
 
-	stmt := &gorm.Statement{DB: query.Statement.DB}
-	if err := stmt.Parse(query.Statement.Model); err != nil {
-		log.Println(err)
-	}
-	table := stmt.Table
+	// ToSQL with dry run to generate the SQL query without executing it
+	sql := result.Session(&gorm.Session{DryRun: true}).ToSQL(func(tx *gorm.DB) *gorm.DB {
+		return tx.Find([]interface{}{})
+	})
+	sum := sha256.Sum256([]byte(sql))
+	cacheKey := hex.EncodeToString(sum[:])
 
-	cacheKey := ""
-	if table != "" {
-		cacheKey = fmt.Sprintf("table:%s:count", table)
-	}
 	if cacheEnabled && cacheKey != "" {
 		if count, err := cache.Get(cacheKey); count != "" && err == nil {
 			countResult, err = strconv.ParseInt(count, 10, 64)
