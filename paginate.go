@@ -747,9 +747,9 @@ func generateWhereCauses(f PageFilters, config Config) ([]string, []interface{})
 					params = append(params, valueFixer(values[0]), valueFixer(values[1]))
 				}
 			case "IN", "NOT IN":
-				if values, ok := f.Value.([]interface{}); ok {
+				if stringVal, ok := f.Value.(string); ok {
 					wheres = append(wheres, fname, f.Operator, "?")
-					params = append(params, valueFixer(values))
+					params = append(params, valueFixer(strings.Split(stringVal, ",")))
 				}
 			case "LIKE", "NOT LIKE", "ILIKE", "NOT ILIKE":
 				if config.FieldWrapper != "" {
